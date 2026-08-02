@@ -7,11 +7,10 @@ from fastapi.responses import PlainTextResponse
 
 from .aoml import render_results
 from .dump_loader import import_from_url, parse_items_zip
-from .store import ItemStore
+from .store import store
+from .v2 import router as v2_router
 
 logger = logging.getLogger(__name__)
-
-store = ItemStore()
 
 
 def _load_items() -> None:
@@ -41,6 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="aodb-api", lifespan=lifespan)
+app.include_router(v2_router)
 
 
 def _truthy(value: str) -> bool:

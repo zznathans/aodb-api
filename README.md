@@ -8,11 +8,27 @@ it's a drop-in replacement via BeBot's `Items.CIDB` setting.
 
 ## API
 
+### v1 (BeBot / AOML)
+
 `GET /?bot=BeBot&output=aoml&max=50&search=<name>&ql=<ql>&icons=true&color_header=<hex>&color_highlight=<hex>&color_normal=<hex>`
 
 Only `output=aoml` is implemented (the only value BeBot ever sends). Always
 returns HTTP 200 with a body (including "no results"), since BeBot's client
 does no status-code checking and shows the raw response verbatim in chat.
+
+### v2 (plain JSON)
+
+A normal JSON API for anything else that wants item data - no BeBot-specific
+quirks, real HTTP status codes.
+
+- `GET /v2/items?q=<name>&ql=<ql>&limit=50&offset=0` or the equivalent
+  `POST /v2/items` with the same fields as a JSON body - both return a bare
+  JSON array of `{"id", "name", "ql", "icon", "description"}`, with the
+  total match count (pre-pagination) in the `X-Total-Count` response header.
+- `GET /v2/items/{aoid}` - direct lookup by item id, 404 (JSON body) if not
+  found.
+- Interactive docs at `/docs` (Swagger UI), machine-readable spec at
+  `/openapi.json`.
 
 ## Data
 

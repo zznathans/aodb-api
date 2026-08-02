@@ -42,3 +42,39 @@ def test_len_reflects_loaded_count():
     assert len(store) == 0
     store.load([make_item(id=1, name="x")])
     assert len(store) == 1
+
+
+def test_search_respects_offset():
+    store = ItemStore()
+    store.load(
+        [
+            make_item(id=1, name="Alpha Item"),
+            make_item(id=2, name="Beta Item"),
+            make_item(id=3, name="Gamma Item"),
+        ]
+    )
+
+    results = store.search(query="Item", ql=0, limit=2, offset=1)
+    assert [i.name for i in results] == ["Beta Item", "Gamma Item"]
+
+
+def test_count_reflects_total_matches_not_limit():
+    store = ItemStore()
+    store.load(
+        [
+            make_item(id=1, name="Alpha Item"),
+            make_item(id=2, name="Beta Item"),
+            make_item(id=3, name="Gamma Item"),
+        ]
+    )
+
+    assert store.count(query="Item", ql=0) == 3
+    assert len(store.search(query="Item", ql=0, limit=1)) == 1
+
+
+def test_get_returns_item_by_id_or_none():
+    store = ItemStore()
+    store.load([make_item(id=42, name="Notum Tank Armor")])
+
+    assert store.get(42).name == "Notum Tank Armor"
+    assert store.get(999) is None
