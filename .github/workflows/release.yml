@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      !contains(github.event.workflow_run.head_commit.message, '[skip ci]')
+    steps:
+      # RELEASE_PAT: fine-grained PAT scoped to this repo and
+      # zznathans/aodb-api-helm (Contents: write, Pull requests: write),
+      # mirroring BeBot's RELEASE_PAT. Needed instead of the default
+      # GITHUB_TOKEN because releases created with the default token don't
+      # trigger other workflows' `release: published` events, which
+      # docker.yml depends on.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - uses: cycjimmy/semantic-release-action@v6
+        with:
+          semantic_version: 25
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}

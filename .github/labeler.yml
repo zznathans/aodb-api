@@ -1,0 +1,21 @@
+app:
+  - changed-files:
+      - any-glob-to-any-file: "app/**"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+          - ".dockerignore"
+
+scripts:
+  - changed-files:
+      - any-glob-to-any-file: "scripts/**"
