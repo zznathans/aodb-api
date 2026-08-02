@@ -27,8 +27,17 @@ quirks, real HTTP status codes.
   total match count (pre-pagination) in the `X-Total-Count` response header.
 - `GET /v2/items/{aoid}` - direct lookup by item id, 404 (JSON body) if not
   found.
+- `GET`/`POST /v2/nanos` - same shape as `/v2/items`, plus `school` (exact
+  match, e.g. `Combat`/`Healing`/`Psionic`/`Space`/`Protection`) and
+  `profession` (raw numeric profession id as it appears in the dump - not
+  translated to a name, since there's no authoritative id→name mapping
+  available to verify against). Response objects additionally include
+  `strain`, `nanocost`, `ncu`, `crystal_id`, `duration`, `profession`, and
+  `requirements` (the full list of casting requirements from the dump, as
+  `{"attribute", "operator", "value"}`).
+- `GET /v2/nanos/{aoid}` - direct lookup by nano id.
 - Interactive docs at `/docs` (Swagger UI), machine-readable spec at
-  `/openapi.json`.
+  `/openapi.json` (`/healthz` is intentionally excluded from both).
 
 ## Data
 
