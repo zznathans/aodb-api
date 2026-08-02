@@ -6,8 +6,8 @@ from fastapi import FastAPI, Query, Response
 from fastapi.responses import PlainTextResponse
 
 from .aoml import render_results
-from .dump_loader import import_from_url, parse_items_zip
-from .store import store
+from .dump_loader import import_from_url, parse_dump_zip
+from .store import nano_store, store
 from .v2 import router as v2_router
 
 logger = logging.getLogger(__name__)
@@ -17,20 +17,24 @@ def _load_items() -> None:
     """Loads the item dump into memory before the app starts accepting
     traffic. DUMP_URL pulls the dump zip from its public HTTPS URL - the
     normal deployed path. DUMP_PATH loads a local dump zip instead, for
-    local dev. With neither set, the store stays empty and the API serves
+    local dev. With neither set, the stores stay empty and the API serves
     "no results" for everything rather than failing to start."""
     dump_url = os.environ.get("DUMP_URL")
     if dump_url:
-        store.load(import_from_url(dump_url))
+        items, nanos = import_from_url(dump_url)
+        store.load(items)
+        nano_store.load(nanos)
         return
 
     dump_path = os.environ.get("DUMP_PATH")
     if dump_path:
         with open(dump_path, "rb") as f:
-            store.load(parse_items_zip(f.read()))
+            items, nanos = parse_dump_zip(f.read())
+        store.load(items)
+        nano_store.load(nanos)
         return
 
-    logger.warning("Neither DUMP_URL nor DUMP_PATH is set - serving with an empty item store")
+    logger.warning("Neither DUMP_URL nor DUMP_PATH is set - serving with empty item/nano stores")
 
 
 @asynccontextmanager
@@ -79,6 +83,6 @@ def search(
     )
 
 
-@app.get("/healthz", response_class=PlainTextResponse)
+@app.get("/healthz", response_class=PlainTextResponse, include_in_schema=False)
 def healthz():
     return "ok"
