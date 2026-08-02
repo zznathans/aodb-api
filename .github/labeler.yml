@@ -1,6 +1,18 @@
-app:
+api-v1:
   - changed-files:
-      - any-glob-to-any-file: "app/**"
+      - any-glob-to-any-file:
+          - "app/main.py"
+          - "app/aoml.py"
+
+api-v2:
+  - changed-files:
+      - any-glob-to-any-file: "app/v2.py"
+
+data:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/store.py"
+          - "app/dump_loader.py"
 
 tests:
   - changed-files:
@@ -15,3 +27,13 @@ docker:
       - any-glob-to-any-file:
           - "Dockerfile"
           - ".dockerignore"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: "**/*.md"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "requirements.txt"
+          - "requirements-dev.txt"
