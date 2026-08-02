@@ -32,10 +32,3 @@ pytest
 
 `DUMP_URL` (used in production) works too; `DUMP_PATH` is for a local file
 without needing network access.
-
-## Deployment
-
-Built and pushed to `ghcr.io/zznathans/aodb-api` on each GitHub Release
-(`.github/workflows/docker.yml`), then rolled out via the
-[`aodb-api-helm`](https://github.com/zznathans/aodb-api-helm) chart,
-deployed through ArgoCD from `zznathans/charts`.
