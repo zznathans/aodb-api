@@ -24,3 +24,15 @@ def client(monkeypatch):
         yield test_client, main_module
 
     os.remove(path)
+
+
+@pytest.fixture()
+def db_session_factory():
+    fd, path = tempfile.mkstemp(suffix=".sqlite3")
+    os.close(fd)
+
+    from app.db import make_session_factory
+
+    yield make_session_factory(f"sqlite:///{path}")
+
+    os.remove(path)

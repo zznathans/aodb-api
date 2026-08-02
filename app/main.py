@@ -1,10 +1,55 @@
+import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Query, Response
 from fastapi.responses import PlainTextResponse
 
 from .aoml import render_results
 from .db import Item, make_session_factory
+from .dump_loader import import_from_s3
 
-app = FastAPI(title="aodb-api")
+logger = logging.getLogger(__name__)
+
+
+def _import_from_s3_if_empty() -> None:
+    """One-time bootstrap: if S3_BUCKET is configured and the items table is
+    empty, pull and load the dump before serving traffic. Meant for a dump
+    that changes rarely - readiness is intentionally gated on this
+    completing, so a bad/missing dump surfaces as a stuck rollout rather
+    than an API silently serving zero results. Re-run manually (via
+    scripts/import_dump.py, or by emptying the table and restarting) to
+    pick up a refreshed dump - this only ever fires once per empty table."""
+    bucket = os.environ.get("S3_BUCKET")
+    if not bucket:
+        return
+
+    session = SessionLocal()
+    try:
+        if session.query(Item).first() is not None:
+            logger.info("items table already populated, skipping S3 import")
+            return
+
+        import_from_s3(
+            session=session,
+            bucket=bucket,
+            key=os.environ["S3_KEY"],
+            endpoint_url=os.environ.get("S3_ENDPOINT"),
+            region=os.environ.get("S3_REGION", "auto"),
+            access_key=os.environ["S3_ACCESS_KEY"],
+            secret_key=os.environ["S3_SECRET_KEY"],
+        )
+    finally:
+        session.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _import_from_s3_if_empty()
+    yield
+
+
+app = FastAPI(title="aodb-api", lifespan=lifespan)
 SessionLocal = make_session_factory()
 
 

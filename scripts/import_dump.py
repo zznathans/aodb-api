@@ -1,53 +1,31 @@
 """One-off loader from your items-database dump into the `items` table this
 service reads from (see app/db.py:Item for the target schema: id, name, ql,
-icon, description).
+icon, description; app/dump_loader.py:load_items_csv for the column mapping
+- adjust the TODO there to match your dump's actual headers).
 
-This is deliberately NOT wired into the app's startup or CI - it's a manual
-step you run once against the target MariaDB (or re-run whenever you refresh
-the dump). Adjust SOURCE_PATH and the row-mapping below to match your dump's
-actual columns/format before running.
+For a dump hosted in S3 that should load automatically on first boot, see
+the S3_BUCKET/S3_KEY/etc. env vars handled by app/main.py's startup hook
+instead - this script is for a one-off local file, or for manually
+re-loading after emptying the table.
 
 Usage:
     DATABASE_URL=mysql+pymysql://user:pass@host:3306/aodb \
         python scripts/import_dump.py /path/to/your/dump.csv
 """
 
-import csv
 import sys
 
-from app.db import Item, make_session_factory
+from app.db import make_session_factory
+from app.dump_loader import load_items_csv
 
 
 def main(dump_path: str) -> None:
     SessionLocal = make_session_factory()
     session = SessionLocal()
-
     with open(dump_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        batch = []
-        for row in reader:
-            # TODO: adjust these key names to match your dump's actual
-            # column headers once you know its exact shape.
-            batch.append(
-                Item(
-                    id=int(row["aoid"]),
-                    name=row["name"],
-                    ql=int(row.get("ql") or 0),
-                    icon=int(row.get("icon") or 0),
-                    description=row.get("description"),
-                )
-            )
-            if len(batch) >= 1000:
-                session.bulk_save_objects(batch)
-                session.commit()
-                batch.clear()
-
-        if batch:
-            session.bulk_save_objects(batch)
-            session.commit()
-
+        count = load_items_csv(session, f)
     session.close()
-    print("Import complete.")
+    print(f"Import complete: {count} items loaded.")
 
 
 if __name__ == "__main__":
