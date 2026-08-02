@@ -16,17 +16,22 @@ does no status-code checking and shows the raw response verbatim in chat.
 
 ## Data
 
-Backed by a MariaDB `items` table (`id`, `name`, `ql`, `icon`, `description`
-— see `app/db.py`). Load your item dump with `scripts/import_dump.py`
-(adjust the column mapping to match your dump's actual format first).
+No database - the item dump (a zipped `<aodb><item aoid="..." .../></aodb>`
+XML file, e.g. `171003.xml.zip`) is small (~65MB in memory, ~125k items)
+and changes rarely, so each pod loads its own in-memory copy from a public
+HTTPS URL on startup (`app/dump_loader.py`, `app/store.py`). Readiness is
+gated on this completing.
 
 ## Local development
 
 ```
 pip install -r requirements-dev.txt
-DATABASE_URL=sqlite:///./dev.sqlite3 uvicorn app.main:app --reload
+DUMP_PATH=/path/to/171003.xml.zip uvicorn app.main:app --reload
 pytest
 ```
+
+`DUMP_URL` (used in production) works too; `DUMP_PATH` is for a local file
+without needing network access.
 
 ## Deployment
 

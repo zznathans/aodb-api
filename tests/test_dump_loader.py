@@ -2,8 +2,7 @@ import io
 import zipfile
 from unittest.mock import MagicMock, patch
 
-from app.db import Item
-from app.dump_loader import import_from_s3, load_items_xml, load_items_zip
+from app.dump_loader import import_from_url, parse_items_xml, parse_items_zip
 
 XML_TEXT = """<?xml version="1.0"?>
 <aodb>
@@ -34,58 +33,35 @@ def _zip_bytes(xml_text: str, filename: str = "dump.xml") -> bytes:
     return buf.getvalue()
 
 
-def test_load_items_xml_parses_expected_fields(db_session_factory):
-    session = db_session_factory()
-    count = load_items_xml(session, io.BytesIO(XML_TEXT.encode("utf-8")))
-    session.close()
+def test_parse_items_xml_parses_expected_fields():
+    items = parse_items_xml(io.BytesIO(XML_TEXT.encode("utf-8")))
 
     # The third <item> has no <name> and is skipped.
-    assert count == 2
-
-    session = db_session_factory()
-    items = session.query(Item).order_by(Item.id).all()
-    session.close()
-
+    assert len(items) == 2
     assert [i.id for i in items] == [21601, 21793]
     assert items[0].name == "Flamethrower Ammunition"
+    assert items[0].name_lower == "flamethrower ammunition"
     assert items[0].ql == 1
     assert items[0].icon == 32168
-    assert "user’s nervous system" in items[1].description or "user" in items[1].description
+    assert "nervous system" in items[1].description
 
 
-def test_load_items_zip_extracts_and_parses(db_session_factory):
-    session = db_session_factory()
-    count = load_items_zip(session, _zip_bytes(XML_TEXT, "171003.xml"))
-    session.close()
-    assert count == 2
+def test_parse_items_zip_extracts_and_parses():
+    items = parse_items_zip(_zip_bytes(XML_TEXT, "171003.xml"))
+    assert len(items) == 2
 
 
-def test_import_from_s3_downloads_and_loads(db_session_factory):
+def test_import_from_url_downloads_and_parses():
     zip_data = _zip_bytes(XML_TEXT)
-    mock_body = MagicMock()
-    mock_body.read.return_value = zip_data
-    mock_client = MagicMock()
-    mock_client.get_object.return_value = {"Body": mock_body}
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = zip_data
+    mock_resp.__enter__.return_value = mock_resp
 
-    session = db_session_factory()
-    with patch("boto3.client", return_value=mock_client) as mock_boto_client:
-        count = import_from_s3(
-            session=session,
-            bucket="aodb-api",
-            key="171003.xml.zip",
-            endpoint_url="https://example.r2.cloudflarestorage.com",
-            region="auto",
-            access_key="AKIA...",
-            secret_key="secret",
-        )
-    session.close()
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        items = import_from_url("https://aodb-api.s3.yeetbox.net/171003.xml.zip")
 
-    assert count == 2
-    mock_boto_client.assert_called_once_with(
-        "s3",
-        endpoint_url="https://example.r2.cloudflarestorage.com",
-        region_name="auto",
-        aws_access_key_id="AKIA...",
-        aws_secret_access_key="secret",
-    )
-    mock_client.get_object.assert_called_once_with(Bucket="aodb-api", Key="171003.xml.zip")
+    assert len(items) == 2
+    (request,), _ = mock_urlopen.call_args
+    assert request.full_url == "https://aodb-api.s3.yeetbox.net/171003.xml.zip"
+    # Cloudflare blocks the default "Python-urllib/..." UA on the real bucket.
+    assert request.get_header("User-agent") == "aodb-api/1.0"

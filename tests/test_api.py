@@ -1,15 +1,13 @@
-def _seed(main_module):
-    from app.db import Item
+from app.store import make_item
 
-    session = main_module.SessionLocal()
-    session.add_all(
+
+def _seed(main_module):
+    main_module.store.load(
         [
-            Item(id=1, name="Notum Tank Armor", ql=200, icon=12345),
-            Item(id=2, name="Notum Splitter", ql=150, icon=54321),
+            make_item(id=1, name="Notum Tank Armor", ql=200, icon=12345),
+            make_item(id=2, name="Notum Splitter", ql=150, icon=54321),
         ]
     )
-    session.commit()
-    session.close()
 
 
 def test_search_returns_matching_items(client):
@@ -67,6 +65,15 @@ def test_unsupported_output_format_still_returns_200_body(client):
     # fail loudly with a 400 rather than silently misrendering, since no real
     # client ever sends anything but output=aoml.
     assert resp.status_code == 400
+
+
+def test_empty_store_still_returns_200(client):
+    test_client, _ = client
+
+    resp = test_client.get("/", params={"output": "aoml", "search": "anything"})
+
+    assert resp.status_code == 200
+    assert "No items found" in resp.text
 
 
 def test_healthz(client):

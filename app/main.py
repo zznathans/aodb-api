@@ -6,51 +6,41 @@ from fastapi import FastAPI, Query, Response
 from fastapi.responses import PlainTextResponse
 
 from .aoml import render_results
-from .db import Item, make_session_factory
-from .dump_loader import import_from_s3
+from .dump_loader import import_from_url, parse_items_zip
+from .store import ItemStore
 
 logger = logging.getLogger(__name__)
 
+store = ItemStore()
 
-def _import_from_s3_if_empty() -> None:
-    """One-time bootstrap: if S3_BUCKET is configured and the items table is
-    empty, pull and load the dump before serving traffic. Meant for a dump
-    that changes rarely - readiness is intentionally gated on this
-    completing, so a bad/missing dump surfaces as a stuck rollout rather
-    than an API silently serving zero results. Re-run manually (via
-    scripts/import_dump.py, or by emptying the table and restarting) to
-    pick up a refreshed dump - this only ever fires once per empty table."""
-    bucket = os.environ.get("S3_BUCKET")
-    if not bucket:
+
+def _load_items() -> None:
+    """Loads the item dump into memory before the app starts accepting
+    traffic. DUMP_URL pulls the dump zip from its public HTTPS URL - the
+    normal deployed path. DUMP_PATH loads a local dump zip instead, for
+    local dev. With neither set, the store stays empty and the API serves
+    "no results" for everything rather than failing to start."""
+    dump_url = os.environ.get("DUMP_URL")
+    if dump_url:
+        store.load(import_from_url(dump_url))
         return
 
-    session = SessionLocal()
-    try:
-        if session.query(Item).first() is not None:
-            logger.info("items table already populated, skipping S3 import")
-            return
+    dump_path = os.environ.get("DUMP_PATH")
+    if dump_path:
+        with open(dump_path, "rb") as f:
+            store.load(parse_items_zip(f.read()))
+        return
 
-        import_from_s3(
-            session=session,
-            bucket=bucket,
-            key=os.environ["S3_KEY"],
-            endpoint_url=os.environ.get("S3_ENDPOINT"),
-            region=os.environ.get("S3_REGION", "auto"),
-            access_key=os.environ["S3_ACCESS_KEY"],
-            secret_key=os.environ["S3_SECRET_KEY"],
-        )
-    finally:
-        session.close()
+    logger.warning("Neither DUMP_URL nor DUMP_PATH is set - serving with an empty item store")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _import_from_s3_if_empty()
+    _load_items()
     yield
 
 
 app = FastAPI(title="aodb-api", lifespan=lifespan)
-SessionLocal = make_session_factory()
 
 
 def _truthy(value: str) -> bool:
@@ -77,16 +67,7 @@ def search(
         response.status_code = 400
         return f"Unsupported output format '{output}' (only 'aoml' is implemented)."
 
-    session = SessionLocal()
-    try:
-        query = session.query(Item)
-        if search:
-            query = query.filter(Item.name.ilike(f"%{search}%"))
-        if ql:
-            query = query.filter(Item.ql == ql)
-        items = query.order_by(Item.name).limit(max).all()
-    finally:
-        session.close()
+    items = store.search(query=search, ql=ql, limit=max)
 
     return render_results(
         items=items,

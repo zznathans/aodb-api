@@ -1,38 +1,19 @@
-import os
-import tempfile
+import importlib
 
 import pytest
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture()
 def client(monkeypatch):
-    fd, path = tempfile.mkstemp(suffix=".sqlite3")
-    os.close(fd)
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{path}")
-
-    # main.py builds its SessionLocal at import time, so import must happen
-    # after DATABASE_URL is set for each test's isolated sqlite file.
-    import importlib
+    # No DUMP_URL/DUMP_PATH set - main.py's lifespan hook leaves the store
+    # empty on startup; tests populate it directly via main_module.store.load().
+    monkeypatch.delenv("DUMP_URL", raising=False)
+    monkeypatch.delenv("DUMP_PATH", raising=False)
 
     from app import main as main_module
 
     importlib.reload(main_module)
 
-    from fastapi.testclient import TestClient
-
     with TestClient(main_module.app) as test_client:
         yield test_client, main_module
-
-    os.remove(path)
-
-
-@pytest.fixture()
-def db_session_factory():
-    fd, path = tempfile.mkstemp(suffix=".sqlite3")
-    os.close(fd)
-
-    from app.db import make_session_factory
-
-    yield make_session_factory(f"sqlite:///{path}")
-
-    os.remove(path)

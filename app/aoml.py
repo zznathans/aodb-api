@@ -7,7 +7,7 @@ for item links (Modules/Ao/Market.php):
     <img src=rdb://ICON> <a href='itemref://ID/ID/QL'>NAME</a> QLQL
 """
 
-from .db import Item
+from .store import Item
 
 
 def _color(hex_color: str | None, text: str) -> str:

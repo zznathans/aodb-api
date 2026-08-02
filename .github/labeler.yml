@@ -15,7 +15,3 @@ docker:
       - any-glob-to-any-file:
           - "Dockerfile"
           - ".dockerignore"
-
-scripts:
-  - changed-files:
-      - any-glob-to-any-file: "scripts/**"
