@@ -1,5 +1,8 @@
 # aodb-api
 
+[![CI](https://github.com/zznathans/aodb-api/actions/workflows/ci.yml/badge.svg)](https://github.com/zznathans/aodb-api/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/zznathans/aodb-api)](https://github.com/zznathans/aodb-api/releases)
+
 Self-hosted replacement for the third-party "Central Item Database"
 (`cidb.bebot.link`) that BeBot's `!items` command relies on, which has been
 suffering Cloudflare 522 (origin timeout) outages. Implements the same
