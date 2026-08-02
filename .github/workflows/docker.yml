@@ -50,28 +50,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan image with Trivy
-        id: trivy
-        continue-on-error: true
+      # Two separate scans rather than one gating on `format: sarif`: the sarif+exit-code
+      # combination in this trivy-action version was observed to fail the step (nonzero
+      # `outcome`) even when the produced SARIF had zero results (verified via the GitHub
+      # code-scanning API - genuinely empty) and a local `trivy image` run against the exact
+      # same pushed digest, same pinned trivy version, passed clean. Trusting a `continue-on-
+      # error` step's ambiguous `outcome` for the actual gate isn't reliable; a plain
+      # `format: table` scan's own exit code is unambiguous, so let it fail the job directly.
+      - name: Scan image for vulnerabilities (fails the build on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/zznathans/aodb-api@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Generate SARIF for the Security tab (informational, non-gating)
+        if: always()
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/zznathans/aodb-api@${{ steps.build.outputs.digest }}
           format: sarif
           output: trivy-results.sarif
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
+          exit-code: "0"
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4.37.3
         if: always() && hashFiles('trivy-results.sarif') != ''
         with:
           sarif_file: trivy-results.sarif
-
-      - name: Fail if Trivy found vulnerabilities
-        if: steps.trivy.outcome == 'failure'
-        run: exit 1
 
   notify-aodb-api-helm:
     name: Notify aodb-api-helm
